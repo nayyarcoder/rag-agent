@@ -1,0 +1,15 @@
+This is a sample document for testing the document ingestion process.
+
+The document contains multiple paragraphs to test the text splitting functionality.
+
+This paragraph contains information about artificial intelligence and machine learning.
+AI systems can process large amounts of data and learn patterns from it.
+Machine learning models can be trained on various types of data including text, images, and audio.
+
+Natural Language Processing (NLP) is a branch of AI that focuses on understanding and generating human language.
+NLP applications include machine translation, sentiment analysis, and question answering systems.
+Modern NLP systems use transformer architectures and large language models to achieve state-of-the-art results.
+
+Vector databases are essential for building efficient retrieval systems.
+They store document embeddings and enable semantic search capabilities.
+This allows us to find relevant information based on meaning rather than just keywords. 
