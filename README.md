@@ -13,33 +13,37 @@ A Retrieval Augmented Generation (RAG) chatbot that can understand and answer qu
 ## Installation
 
 1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/rag-agent.git
-cd rag-agent
-```
 
-2. Create and activate a virtual environment:
-```bash
-python -m venv .venv
-# On Windows
-.venv\Scripts\activate
-# On Unix or MacOS
-source .venv/bin/activate
-```
+    ```bash
+    git clone https://github.com/yourusername/rag-agent.git
+    cd rag-agent
+    ```
 
-3. Install the required dependencies:
-```bash
-pip install -r requirements.txt
-```
+1. Create and activate a virtual environment:
 
-4. Create a `.env` file in the root directory and add your environment variables:
-```
-GROQ_API_KEY=your_groq_api_key_here
-```
+    ```bash
+    python -m venv .venv
+    # On Windows
+    .venv\Scripts\activate
+    # On Unix or MacOS
+    source .venv/bin/activate
+    ```
+
+2. Install the required dependencies:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3. Create a `.env` file in the root directory and add your environment variables:
+
+    ```env
+    GROQ_API_KEY=your_groq_api_key_here
+    ```
 
 ## Project Structure
 
-```
+```text
 rag-agent/
 ├── data/           # Store your documents here
 ├── db/             # ChromaDB vector store
@@ -55,9 +59,10 @@ rag-agent/
 ## Usage
 
 1. Start the Streamlit application:
-```bash
-streamlit run src/streamlit_app.py
-```
+
+    ```bash
+    streamlit run src/streamlit_app.py
+    ```
 
 2. Upload your documents in the "Document Ingestion" tab.
 
@@ -74,6 +79,7 @@ streamlit run src/streamlit_app.py
 ## Development
 
 To run tests:
+
 ```bash
 pytest src/test_*.py
 ```

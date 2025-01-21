@@ -1,0 +1,15 @@
+langchain
+langchain-community
+python-dotenv
+chromadb
+sentence-transformers
+torch
+unstructured
+python-magic
+python-magic-bin
+beautifulsoup4
+pypdf
+streamlit
+docx2txt
+python-docx
+pytest 
