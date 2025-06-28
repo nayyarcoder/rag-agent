@@ -4,8 +4,10 @@ langchain-community>=0.3.0
 langchain-core>=0.3.0
 langchain-text-splitters>=0.3.0
 langchain-huggingface>=0.0.3
-langchain-groq>=0.1.0
 langchain-chroma>=0.1.0
+
+# LLM Integration (supports multiple providers)
+litellm>=1.44.0
 
 # Environment and configuration
 python-dotenv>=1.0.0

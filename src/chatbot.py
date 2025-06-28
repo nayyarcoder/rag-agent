@@ -1,10 +1,9 @@
 import os
 from dotenv import load_dotenv
-import streamlit as st
 from typing import List, Optional
 import time
 from langchain_core.messages import AIMessage, HumanMessage
-from langchain_groq import ChatGroq
+from langchain_community.chat_models.litellm import ChatLiteLLM
 from langchain_community.vectorstores import Chroma
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains import ConversationalRetrievalChain
@@ -12,8 +11,15 @@ from langchain_huggingface import HuggingFaceEmbeddings
 import chromadb
 import logging
 
-from config import get_config
+from config import get_config, get_available_llm_providers
 from exceptions import VectorStoreError, EmbeddingError, ConfigurationError
+
+# Try to import streamlit, but don't fail if it's not available
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,9 +34,14 @@ class RAGChatbot:
         collection_name: Optional[str] = None,
         model_name: Optional[str] = None,
         embedding_model: Optional[str] = None,
+        llm_provider: Optional[str] = None,
     ):
         """Initialize RAG chatbot with enhanced configuration and error handling."""
         self.config = get_config()
+        
+        # Override LLM provider if specified
+        if llm_provider:
+            self.config.llm.provider = llm_provider
         
         # Setup logging if not already configured
         if not logger.handlers:
@@ -124,20 +135,52 @@ class RAGChatbot:
             raise VectorStoreError(f"Retrieval test failed: {str(e)}")
     
     def _initialize_llm(self) -> None:
-        """Initialize LLM with configuration."""
+        """Initialize LLM with configuration supporting multiple providers."""
         try:
-            api_key = os.environ.get("GROQ_API_KEY")
-            if not api_key:
-                raise ConfigurationError("GROQ_API_KEY environment variable not set")
+            provider = self.config.llm.provider.lower()
+            providers_info = get_available_llm_providers()
             
-            self.llm = ChatGroq(
-                temperature=self.config.llm.temperature,
-                model_name=self.model_name,
-                api_key=api_key,
-                max_tokens=self.config.llm.max_tokens,
-                timeout=self.config.llm.timeout_seconds
-            )
-            logger.info(f"LLM initialized with model: {self.model_name}")
+            if provider not in providers_info:
+                raise ConfigurationError(f"Unsupported LLM provider: {provider}. Supported providers: {list(providers_info.keys())}")
+            
+            provider_info = providers_info[provider]
+            
+            # Validate API key for providers that require it
+            if provider_info.get("requires_api_key", True):
+                api_key = self.config.llm.api_key
+                if not api_key:
+                    env_var = provider_info.get("env_var", f"{provider.upper()}_API_KEY")
+                    raise ConfigurationError(f"{env_var} environment variable not set for provider '{provider}'")
+            
+            # Prepare model identifier for LiteLLM
+            if provider == "ollama":
+                # For Ollama, use the model name directly since it's served locally
+                model_identifier = self.model_name
+                api_base = self.config.llm.api_base or provider_info.get("default_api_base", "http://localhost:11434")
+            else:
+                # For cloud providers, prefix with provider name
+                model_identifier = f"{provider}/{self.model_name}"
+                api_base = self.config.llm.api_base
+            
+            # Initialize LiteLLM with provider-specific configuration
+            llm_kwargs = {
+                "model": model_identifier,
+                "temperature": self.config.llm.temperature,
+                "max_tokens": self.config.llm.max_tokens,
+                "timeout": self.config.llm.timeout_seconds,
+            }
+            
+            # Set API key if required
+            if provider_info.get("requires_api_key", True) and self.config.llm.api_key:
+                llm_kwargs["api_key"] = self.config.llm.api_key
+            
+            # Set API base if provided
+            if api_base:
+                llm_kwargs["api_base"] = api_base
+            
+            self.llm = ChatLiteLLM(**llm_kwargs)
+            
+            logger.info(f"LLM initialized with provider: {provider}, model: {self.model_name}")
             
         except Exception as e:
             if isinstance(e, ConfigurationError):
@@ -327,7 +370,7 @@ class RAGChatbot:
             logger.info(f"Total response time: {total_time:.2f}s")
             
             # Enhanced document display in Streamlit
-            if hasattr(st, 'expander'):  # Check if running in Streamlit context
+            if HAS_STREAMLIT and hasattr(st, 'expander'):  # Check if running in Streamlit context
                 with st.expander("📄 View Retrieved Document Chunks", expanded=False):
                     if not source_docs:
                         st.warning("No relevant chunks were retrieved for this query.")
@@ -467,15 +510,28 @@ class RAGChatbot:
         
         # Check LLM (basic)
         try:
-            # Don't actually call LLM to avoid API costs, just check if it's configured
-            api_key = os.environ.get("GROQ_API_KEY")
+            # Check provider configuration
+            provider = self.config.llm.provider.lower()
+            providers_info = get_available_llm_providers()
+            provider_info = providers_info.get(provider, {})
+            
+            # Check API key for providers that require it
+            api_key_configured = True
+            if provider_info.get("requires_api_key", True):
+                api_key = self.config.llm.api_key
+                api_key_configured = bool(api_key)
+            
             health["checks"]["llm"] = {
-                "status": "ok" if api_key else "warning",
+                "status": "ok" if api_key_configured else "warning",
+                "provider": provider,
                 "model": self.model_name,
-                "api_key_configured": bool(api_key)
+                "api_key_configured": api_key_configured,
+                "api_base": self.config.llm.api_base
             }
-            if not api_key:
+            
+            if not api_key_configured and provider_info.get("requires_api_key", True):
                 health["status"] = "degraded"
+                
         except Exception as e:
             health["checks"]["llm"] = {"status": "error", "error": str(e)}
             health["status"] = "unhealthy"
@@ -484,12 +540,17 @@ class RAGChatbot:
 
 def initialize_session_state():
     """Initialize session state variables."""
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-    if "chatbot" not in st.session_state:
-        st.session_state.chatbot = None
+    if HAS_STREAMLIT:
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+        if "chatbot" not in st.session_state:
+            st.session_state.chatbot = None
 
 def main():
+    if not HAS_STREAMLIT:
+        print("Streamlit not available. This function requires Streamlit to run.")
+        return
+        
     st.set_page_config(
         page_title="RAG Chatbot",
         page_icon="🤖",
@@ -518,8 +579,8 @@ def main():
         
         model_name = st.selectbox(
             "Model",
-            options=["llama-3.1-8b-instant", "llama3-8b-8192"],
-            help="Groq model to use"
+            options=["llama-3.1-8b-instant", "llama3-8b-8192", "gpt-4o-mini", "claude-3-haiku-20240307"],
+            help="LLM model to use (provider will be auto-detected)"
         )
         
         if st.button("Initialize Chatbot"):

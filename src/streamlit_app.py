@@ -339,12 +339,53 @@ def render_chatbot_tab():
             help="Choose which document collection to query"
         )
         
-        # Model configuration
-        model_name = st.selectbox(
-            "LLM Model",
-            options=["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.2-90b-text-preview"],
-            help="Groq model to use for responses"
+        # LLM Provider and Model configuration
+        from config import get_available_llm_providers
+        
+        providers_info = get_available_llm_providers()
+        provider_names = list(providers_info.keys())
+        
+        selected_provider = st.selectbox(
+            "LLM Provider",
+            options=provider_names,
+            index=0,  # Default to first provider (groq)
+            help="Choose your LLM provider. Each provider requires different API keys."
         )
+        
+        provider_info = providers_info[selected_provider]
+        
+        # Show provider information
+        with st.expander(f"ℹ️ {provider_info['name']} Configuration", expanded=False):
+            st.write(f"**Description:** {provider_info['description']}")
+            
+            if provider_info.get('requires_api_key', True):
+                env_var = provider_info['env_var']
+                api_key_set = bool(os.getenv(env_var))
+                
+                if api_key_set:
+                    st.success(f"✅ API key configured ({env_var})")
+                else:
+                    st.error(f"❌ API key not set. Please set {env_var} environment variable.")
+                    
+            if selected_provider == 'ollama':
+                ollama_base = os.getenv('OLLAMA_API_BASE', 'http://localhost:11434')
+                st.info(f"**API Base:** {ollama_base}")
+                st.write("Make sure Ollama is running locally or set OLLAMA_API_BASE to your Ollama server.")
+        
+        # Model selection based on provider
+        available_models = provider_info.get('models', [])
+        if available_models:
+            model_name = st.selectbox(
+                f"{provider_info['name']} Model",
+                options=available_models,
+                help=f"Available models for {provider_info['name']}"
+            )
+        else:
+            model_name = st.text_input(
+                "Custom Model Name",
+                value="llama-3.1-8b-instant",
+                help="Enter the model name for your provider"
+            )
         
         embedding_model = st.selectbox(
             "Embedding Model",
@@ -387,7 +428,8 @@ def render_chatbot_tab():
                     st.session_state.chatbot = RAGChatbot(
                         collection_name=selected_collection,
                         model_name=model_name,
-                        embedding_model=embedding_model
+                        embedding_model=embedding_model,
+                        llm_provider=selected_provider
                     )
                     
                     # Perform health check
@@ -412,8 +454,9 @@ def render_chatbot_tab():
                             st.error("• Make sure you've ingested documents with the correct collection name")
                         elif "empty" in str(e):
                             st.error("• The collection exists but has no documents - try ingesting files")
-                        elif "GROQ_API_KEY" in str(e):
-                            st.error("• Set your GROQ_API_KEY environment variable")
+                        elif "API_KEY" in str(e) or "api_key" in str(e):
+                            st.error("• Set your LLM provider API key environment variable")
+                            st.error("• Check the configuration for your selected LLM provider")
     
     # Main chat interface
     if "chatbot" not in st.session_state or st.session_state.chatbot is None:
@@ -647,7 +690,11 @@ def render_system_status_tab():
     st.subheader("🌍 Environment")
     
     env_vars = [
+        "LLM_PROVIDER",
         "GROQ_API_KEY",
+        "OPENAI_API_KEY", 
+        "ANTHROPIC_API_KEY",
+        "OLLAMA_API_BASE",
         "CHUNK_SIZE", 
         "CHUNK_OVERLAP",
         "EMBEDDING_MODEL",
