@@ -13,6 +13,14 @@ A production-ready Retrieval Augmented Generation (RAG) chatbot that can underst
 - **JSON** - API responses and configuration files (.json)
 - **Markdown** - Documentation and README files (.md)
 
+### 🤖 **Multi-Provider LLM Support**
+- **Groq** - Fast inference with open-source models (llama-3.1, mixtral)
+- **OpenAI** - GPT-4o, GPT-4o-mini, GPT-3.5-turbo models  
+- **Anthropic** - Claude 3.5 Sonnet, Claude 3 Haiku/Opus
+- **Ollama** - Local LLM inference (llama3.1, mistral, codellama)
+- **Provider Switching** - Easy configuration via environment variables
+- **Cost Optimization** - Choose models based on performance/cost needs
+
 ### 🚀 **Production-Ready Features**
 - **Robust Error Handling** - Custom exceptions with detailed context
 - **Concurrent Processing** - Multi-threaded document ingestion
@@ -85,7 +93,14 @@ nano .env
 
 **Required Configuration:**
 ```env
+# Choose your LLM provider (groq, openai, anthropic, ollama)
+LLM_PROVIDER=groq
+
+# Set the appropriate API key for your provider
 GROQ_API_KEY=your_groq_api_key_here
+# OPENAI_API_KEY=your_openai_api_key_here 
+# ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# OLLAMA_API_BASE=http://localhost:11434  # For local Ollama
 ```
 
 **Optional Configuration:**
@@ -202,8 +217,13 @@ Based on testing with various document types:
 - Check collection name matches between ingestion and chatbot
 
 **2. API Key Errors**
-- Verify `GROQ_API_KEY` is set in environment variables
+- Verify the appropriate API key is set for your chosen provider:
+  - Groq: `GROQ_API_KEY`
+  - OpenAI: `OPENAI_API_KEY` 
+  - Anthropic: `ANTHROPIC_API_KEY`
+  - Ollama: Ensure `OLLAMA_API_BASE` points to running Ollama instance
 - Check API key validity and quota
+- Verify `LLM_PROVIDER` environment variable is set correctly
 
 **3. File Upload Failures**
 - Verify file type is supported
@@ -267,12 +287,19 @@ documents = loader.load()
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 📚 **Additional Documentation**
+
+- **[Multi-Provider LLM Guide](./MULTI_PROVIDER_GUIDE.md)** - Detailed setup for OpenAI, Anthropic, Ollama, and Groq
+- **Environment Configuration** - Complete `.env.example` reference
+- **Docker Deployment** - Multi-service setup with `docker-compose.yml`
+
 ## 🙏 **Acknowledgments**
 
 - Built with [LangChain](https://github.com/langchain-ai/langchain) for LLM orchestration
 - Uses [ChromaDB](https://github.com/chroma-core/chroma) for vector storage
 - Powered by [Streamlit](https://streamlit.io/) for the web interface
 - Enhanced with [Sentence Transformers](https://www.sbert.net/) for embeddings
+- Multi-provider support via [LiteLLM](https://github.com/BerriAI/litellm)
 
 ## 📞 **Support**
 
@@ -283,4 +310,4 @@ For questions, issues, or feature requests:
 
 ---
 
-**Version 2.0** - Production-ready with enhanced document support and enterprise features.
+**Version 2.0** - Production-ready with multi-provider LLM support and enhanced document processing.
