@@ -1,0 +1,64 @@
+# Production deployment ignore patterns
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Database and logs
+db/
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# SSL certificates (if used)
+ssl/
+*.pem
+*.key
+*.crt
+
+# Backup files
+*.bak
+*.backup
+
+# Node modules (if any)
+node_modules/
+
+# Docker
+.dockerignore
+
+# Test files
+test_results/
+coverage/
+
+# Large data files
+*.h5
+*.pkl
+*.joblib
