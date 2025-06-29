@@ -1,0 +1,7 @@
+users:
+  admin:
+    email: admin@ragagent.local
+    hashed_password: $2b$12$iFXQYD3jy0Sv4MgAzKOhZO7iLaJoxzYif/w5TLxO/iUc899PmEgaa
+    is_active: true
+    name: System Administrator
+    role: admin

@@ -15,6 +15,17 @@ from exceptions import (
     VectorStoreError,
     ConfigurationError
 )
+from auth import (
+    initialize_auth_session,
+    is_authenticated,
+    get_current_user,
+    render_login_form,
+    render_user_info,
+    has_permission,
+    Permission,
+    UserRole,
+    auth_manager
+)
 
 # Initialize configuration
 config = get_config()
@@ -26,6 +37,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Initialize authentication
+initialize_auth_session()
 
 # Add DB_PATH constant
 DB_PATH = Path(config.vector_store.persist_directory)
@@ -69,6 +83,11 @@ def initialize_session_state():
         st.session_state.chatbot = None
 
 def render_ingestion_tab():
+    """Render document ingestion tab with permission check."""
+    if not has_permission(Permission.UPLOAD_DOCUMENTS):
+        st.error("🔒 You don't have permission to upload documents. Contact your administrator.")
+        return
+        
     st.header("📚 Document Ingestion")
     st.write("Upload your documents and configure the ingestion parameters.")
     
@@ -291,6 +310,11 @@ def render_ingestion_tab():
                 st.exception(e)
 
 def render_chatbot_tab():
+    """Render document Q&A tab with permission check."""
+    if not has_permission(Permission.SEARCH_DOCUMENTS):
+        st.error("🔒 You don't have permission to search documents. Contact your administrator.")
+        return
+        
     st.header("🤖 Document Q&A")
     
     # Sidebar for configuration
@@ -547,54 +571,149 @@ def render_chatbot_tab():
                 mime="application/json"
             )
 
+def render_user_management_tab():
+    """Render user management tab for admins only."""
+    if not has_permission(Permission.MANAGE_USERS):
+        st.error("🔒 You don't have permission to manage users. Admin access required.")
+        return
+    
+    st.header("👥 User Management")
+    
+    # Add new user section
+    st.subheader("➕ Add New User")
+    with st.form("add_user_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            new_username = st.text_input("Username")
+            new_name = st.text_input("Full Name")
+        with col2:
+            new_email = st.text_input("Email")
+            new_role = st.selectbox("Role", options=[role.value for role in UserRole])
+        
+        new_password = st.text_input("Password", type="password")
+        submit_add = st.form_submit_button("Add User")
+        
+        if submit_add:
+            if new_username and new_name and new_email and new_password:
+                try:
+                    role_enum = UserRole(new_role)
+                    if auth_manager.create_user(new_username, new_name, new_email, new_password, role_enum):
+                        st.success(f"User {new_username} created successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Username already exists!")
+                except Exception as e:
+                    st.error(f"Error creating user: {e}")
+            else:
+                st.error("Please fill in all fields")
+    
+    st.markdown("---")
+    
+    # List existing users
+    st.subheader("👤 Existing Users")
+    users = auth_manager.list_users()
+    
+    for user in users:
+        with st.expander(f"{user.name} (@{user.username})"):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write(f"**Email:** {user.email}")
+                st.write(f"**Role:** {user.role.value.title()}")
+            with col2:
+                st.write(f"**Status:** {'Active' if user.is_active else 'Inactive'}")
+                st.write(f"**Username:** {user.username}")
+            with col3:
+                if user.username != get_current_user().username:  # Can't delete yourself
+                    if st.button(f"🗑️ Delete", key=f"delete_{user.username}"):
+                        if auth_manager.delete_user(user.username):
+                            st.success(f"User {user.username} deleted!")
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete user")
+
 def main():
+    # Check if user is authenticated
+    if not is_authenticated():
+        render_login_form()
+        return
+    
+    current_user = get_current_user()
+    
     st.title("🤖 RAG Document Assistant")
-    st.caption("Enhanced with multi-format document support and production-ready features")
+    st.caption("Enhanced with multi-format document support and RBAC security")
+    
+    # Show user greeting
+    st.success(f"Welcome back, {current_user.name}! ({current_user.role.value.title()})")
     
     initialize_session_state()
     
-    # Create tabs with enhanced names
-    tab1, tab2, tab3 = st.tabs(["📚 Document Ingestion", "🤖 Document Q&A", "🔧 System Status"])
+    # Create tabs based on user permissions
+    tab_list = []
+    tab_functions = []
     
-    with tab1:
-        render_ingestion_tab()
+    if has_permission(Permission.VIEW_DOCUMENTS):
+        tab_list.append("🤖 Document Q&A")
+        tab_functions.append(render_chatbot_tab)
     
-    with tab2:
-        render_chatbot_tab()
+    if has_permission(Permission.UPLOAD_DOCUMENTS):
+        tab_list.append("📚 Document Ingestion") 
+        tab_functions.append(render_ingestion_tab)
     
-    with tab3:
-        render_system_status_tab()
-    
-    # Enhanced sidebar with system information
-    with st.sidebar:
-        st.markdown("---")
-        st.subheader("📋 System Information")
+    if has_permission(Permission.VIEW_SYSTEM_STATUS):
+        tab_list.append("🔧 System Status")
+        tab_functions.append(render_system_status_tab)
         
-        # Configuration summary
-        with st.expander("⚙️ Configuration", expanded=False):
-            st.write(f"**Environment:** {config.environment}")
-            st.write(f"**Debug Mode:** {config.debug}")
-            st.write(f"**DB Path:** {config.vector_store.persist_directory}")
-            st.write(f"**Max File Size:** {config.document.max_file_size_mb} MB")
-        
-        # Supported formats
-        with st.expander("📄 Supported Formats", expanded=False):
-            extensions = DocumentLoaderFactory.get_supported_extensions()
-            for ext in extensions:
-                st.write(f"• `{ext}`")
-        
-        # Quick stats
-        try:
-            collections = RAGChatbot.get_available_collections()
-            if collections:
-                total_docs = sum(c['count'] for c in collections)
-                st.metric("Total Documents", total_docs)
-                st.metric("Collections", len(collections))
-        except:
-            pass
+    if has_permission(Permission.MANAGE_USERS):
+        tab_list.append("👥 User Management")
+        tab_functions.append(render_user_management_tab)
+    
+    # Create tabs
+    if tab_list:
+        tabs = st.tabs(tab_list)
+        for tab, func in zip(tabs, tab_functions):
+            with tab:
+                func()
+    else:
+        st.error("You don't have permission to access any features. Contact your administrator.")
+    
+    # Show user info in sidebar
+    render_user_info()
+    
+    # Enhanced sidebar with system information (if permitted)
+    if has_permission(Permission.VIEW_SYSTEM_STATUS):
+        with st.sidebar:
+            st.markdown("---")
+            st.subheader("📋 System Information")
+            
+            # Configuration summary
+            with st.expander("⚙️ Configuration", expanded=False):
+                st.write(f"**Environment:** {config.environment}")
+                st.write(f"**Debug Mode:** {config.debug}")
+                st.write(f"**DB Path:** {config.vector_store.persist_directory}")
+                st.write(f"**Max File Size:** {config.document.max_file_size_mb} MB")
+            
+            # Supported formats
+            with st.expander("📄 Supported Formats", expanded=False):
+                extensions = DocumentLoaderFactory.get_supported_extensions()
+                for ext in extensions:
+                    st.write(f"• `{ext}`")
+            
+            # Quick stats
+            try:
+                collections = RAGChatbot.get_available_collections()
+                if collections:
+                    total_docs = sum(c['count'] for c in collections)
+                    st.metric("Total Documents", total_docs)
+                    st.metric("Collections", len(collections))
+            except:
+                pass
 
 def render_system_status_tab():
-    """Render system status and health information."""
+    """Render system status and health information with permission check."""
+    if not has_permission(Permission.VIEW_SYSTEM_STATUS):
+        st.error("🔒 You don't have permission to view system status. Contact your administrator.")
+        return
+        
     st.header("🔧 System Status & Health")
     
     # Overall system health
