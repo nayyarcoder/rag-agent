@@ -1,0 +1,19 @@
+users:
+  admin:
+    email: admin@ragagent.local
+    hashed_password: $2b$12$qAq4UaEez9wWVoioR7kGKuSFFs3PJ.ZfRcAGtLl/Yoty2rvefUJ5G
+    is_active: true
+    name: System Administrator
+    role: admin
+  testuser:
+    email: test@example.com
+    hashed_password: $2b$12$8HdpVQwroLNOFIxhC.aOveyHZiDTkS9mIx6SUFLI7RyxBMtRNcjq2
+    is_active: true
+    name: Test User
+    role: user
+  viewer:
+    email: viewer@example.com
+    hashed_password: $2b$12$wECIwpFamtQFjjs8Qr8E2.wPj/xeCQO0eoJmEdGh.k76qu4E66Ch6
+    is_active: true
+    name: Viewer User
+    role: viewer
